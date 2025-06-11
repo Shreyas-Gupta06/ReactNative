@@ -1,2 +1,0 @@
-﻿# React Native Projects
-1) Step counter app: Counts steps, shows and saves history, shows calories, time and distance walked
