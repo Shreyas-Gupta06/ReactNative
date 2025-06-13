@@ -6,8 +6,13 @@ import * as Notifications from "expo-notifications";
 const STORAGE_KEY = "stepData";
 const CURRENT_KEY = "currentSteps";
 const LAST_UPDATED_KEY = "lastUpdatedDate";
+const STEP_HISTORY_KEY = "stepHistory";
 
-export const getTodayDate = () => new Date().toISOString().split("T")[0];
+// Helper to get today's date as YYYY-MM-DD
+function getTodayDate() {
+  const d = new Date();
+  return d.toISOString().slice(0, 10);
+}
 
 const dateNDaysAgo = (n: number) => {
   const date = new Date();
@@ -110,6 +115,7 @@ export const saveStepData = async (data: any) => {
 export function useStepCounter() {
   const [stepCount, setStepCount] = useState(0);
   const [stepGoal, setStepGoal] = useState(10000);
+  const [stepHistory, setStepHistory] = useState({});
   const [loaded, setLoaded] = useState(false);
   const lastStepTime = useRef(0);
 
@@ -117,14 +123,58 @@ export function useStepCounter() {
   useEffect(() => {
     const load = async () => {
       const rawSteps = await AsyncStorage.getItem("currentSteps");
-      if (rawSteps !== null) setStepCount(parseInt(rawSteps));
       const rawGoal = await AsyncStorage.getItem("stepGoal");
-      if (rawGoal !== null) setStepGoal(parseInt(rawGoal));
+      const rawHistory = await AsyncStorage.getItem("stepHistory");
+      const today = getTodayDate();
+
+      let steps = rawSteps !== null ? parseInt(rawSteps) : 0;
+      let goal = rawGoal !== null ? parseInt(rawGoal) : 10000;
+      let history = rawHistory ? JSON.parse(rawHistory) : {};
+
+      // If today is not in history, reset steps to 0 for new day
+      if (!history[today]) {
+        steps = 0;
+        history[today] = 0;
+        // Keep only last 7 days
+        const dates = Object.keys(history).sort();
+        if (dates.length > 7) {
+          delete history[dates[0]];
+        }
+        await AsyncStorage.setItem("currentSteps", "0");
+        await AsyncStorage.setItem("stepHistory", JSON.stringify(history));
+      }
+
+      setStepCount(steps);
+      setStepGoal(goal);
+      setStepHistory(history);
       setLoaded(true);
-      //console.log("first time!!!! Loaded steps:", stepCount, "Goal:", stepGoal);
     };
     load();
   }, []);
+
+  // Save step count and update step history whenever stepCount changes
+  useEffect(() => {
+    if (loaded) {
+      const save = async () => {
+        const today = getTodayDate();
+        let rawHistory = await AsyncStorage.getItem("stepHistory");
+        let history = rawHistory ? JSON.parse(rawHistory) : {};
+        history[today] = stepCount;
+
+        // Keep only last 7 days
+        const dates = Object.keys(history).sort();
+        while (dates.length > 7) {
+          delete history[dates[0]];
+          dates.shift();
+        }
+
+        setStepHistory(history);
+        await AsyncStorage.setItem("currentSteps", stepCount.toString());
+        await AsyncStorage.setItem("stepHistory", JSON.stringify(history));
+      };
+      save();
+    }
+  }, [stepCount, loaded]);
 
   useEffect(() => {
     //console.log("Loaded steps:", stepCount, "Goal:", stepGoal);
@@ -168,7 +218,7 @@ export function useStepCounter() {
           trigger: null,
         });
       }
-    }, 5000); // every 5 sec
+    }, 7200000); // every 2 hr
 
     return () => clearInterval(interval);
   }, [stepCount, stepGoal]);
@@ -189,5 +239,12 @@ export function useStepCounter() {
     console.log("Steps reset to 0");
   }
 
-  return { stepCount, resetSteps, stepGoal, setStepGoal };
+  return {
+    stepCount,
+    resetSteps,
+    stepGoal,
+    setStepGoal,
+    stepHistory,
+    // setStepCount, // <-- now returned
+  };
 }

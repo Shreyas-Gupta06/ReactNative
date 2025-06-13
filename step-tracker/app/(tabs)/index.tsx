@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import * as Animatable from "react-native-animatable";
 import {
   View,
   Text,
@@ -11,12 +10,14 @@ import {
   StatusBar,
   Modal,
   Pressable,
+  ScrollView,
 } from "react-native";
-import { useStepCounter } from "../../assets/functions";
-import { AnimatedCircularProgress } from "react-native-circular-progress";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+import * as Animatable from "react-native-animatable";
+import { AnimatedCircularProgress } from "react-native-circular-progress";
 import * as Notifications from "expo-notifications";
 import styles from "../../assets/styles";
+import { useStepCounterContext } from "../../assets/StepCounterContext";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -30,7 +31,10 @@ const STEP_LENGTH = 0.75; // meters
 const CALORIES_PER_STEP = 0.045;
 
 export default function StepPage() {
-  const { stepCount, resetSteps, setStepGoal, stepGoal } = useStepCounter();
+  const context = useStepCounterContext();
+  if (!context) return null;
+  const { stepCount, stepGoal, setStepGoal, resetSteps } = context;
+
   const [goalInput, setGoalInput] = useState(stepGoal.toString()); // for equating inputgoal and stepgoal
   const [showCelebration, setShowCelebration] = useState(false);
   const [resetPressed, setResetPressed] = useState(false); // reset button
